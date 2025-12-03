@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { width: 300px; font-family: 'Segoe UI', sans-serif; padding: 15px; color: #333; background-color: #fcfcfc;}
+    h2 { margin-top: 0; font-size: 16px; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; color: #444;}
+    
+    .status-box { padding: 12px; border-radius: 6px; margin-bottom: 10px; text-align: center; color: white; font-weight: bold; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+    
+    /* Colores uso de Cloudflare */
+    .cf-yes { background-color: #f38020; } 
+    .cf-no { background-color: #95a5a6; } 
+    
+    /* Bloque de info de bloqueos */
+    .block-warning { background-color: #f10f0f; color: #ffffff; }
+    .block-safe { background-color: #27ae60; } 
+    
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #7f8c8d; margin-bottom: 5px; font-weight: 600;}
+    .details { font-size: 12px; background: #eee; padding: 8px; border-radius: 4px; color: #2c3e50;}
+    .row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h2>#LaLigaGate</h2>
+
+  <div class="label">Estado de bloqueo</div>
+  <div id="block-status" class="status-box cf-no">Cargando...</div>
+
+  <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 15px 0;">
+
+  <div class="label">Infraestructura</div>
+  <div id="cf-status" class="status-box cf-no">Analizando...</div>
+  
+  <div id="cf-details" class="details" style="display:none;">
+    <div class="row"><span>Ray ID:</span> <strong id="ray-id">-</strong></div>
+    <div class="row"><span>Caché:</span> <strong id="cache-status">-</strong></div>
+</div>
+
+<p style="font-size: 14px; color: #000000; margin-top: 8px;"><b>Nota:</b> Esta comprobación no significa que el sitio no esté afectado, ya que sólo se rastrean las IPs más populares. En el caso de Cloudflare, por ejemplo, hay aproximadamente unas <b>500 IPs</b> bloqueadas cada partido que son también compartidas por otras páginas.</p>
+
+  <script src="popup.js"></script>
+</body>
+</html>
