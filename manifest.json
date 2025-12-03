@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "#LaLigaGate: Detector de bloqueos",
+  "version": "1.0",
+  "description": "Herramienta de análisis técnico para verificar el estado de conexión, IPs y uso de Cloudflare en sitios web. #LaLigaGate.",
+  "permissions": [
+    "webRequest",
+    "storage",
+    "tabs",
+    "alarms" 
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "https://hayahora.futbol/estado/data.json"
+  ],
+  "icons": {
+    "16": "cf-blocked.png",
+    "48": "cf-blocked.png",
+    "128": "cf-blocked.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "cf-off.png",
+      "48": "cf-off.png",
+      "128": "cf-off.png"
+    }
+  }
+}
