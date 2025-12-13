@@ -80,10 +80,19 @@ chrome.webRequest.onHeadersReceived.addListener(
 );
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && tab.url.startsWith('http')) {
+  // Procesar cualquier cambio de pestaña, especialmente cuando se carga
+  if (changeInfo.status === 'complete') {
     
     if (!tabStates[tabId]) resetTabState(tabId);
     
+    // Si no es una URL HTTP válida (es about:blank, chrome://, etc.), usar icono por defecto
+    if (!tab.url || !tab.url.startsWith('http')) {
+      console.log("ℹ️ URL no procesable:", tab.url);
+      chrome.action.setIcon({ tabId: tabId, path: "cf-off.png" });
+      chrome.storage.local.set({ [tabId]: tabStates[tabId] });
+      return;
+    }
+
     // Dar un pequeño delay para que el evento onHeadersReceived se haya ejecutado
     // y tengamos la IP disponible
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -143,6 +152,12 @@ function resetTabState(tabId) {
     serverIP: null 
   };
 }
+
+// Establecer icono por defecto cuando se crea una nueva pestaña
+chrome.tabs.onCreated.addListener((tab) => {
+  resetTabState(tab.id);
+  chrome.action.setIcon({ tabId: tab.id, path: "cf-off.png" });
+});
 
 // Función síncrona mejorada para búsqueda eficiente
 function checkBlockStatus(currentUrl, ipAddress) {
