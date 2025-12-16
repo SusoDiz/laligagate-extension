@@ -1,5 +1,5 @@
 let tabStates = {};
-let cachedBlockList = { ips: new Set(), lastUpdate: 0 }; // Estructura mejorada
+let cachedBlockList = { ips: new Set(), lastUpdate: 0, fullData: {} }; // Incluye datos completos
 let lastUpdate = 0;
 
 // --- 1. GESTIÓN DE LA LISTA DE BLOQUEOS (API JSON) ---
@@ -14,15 +14,29 @@ async function updateBlockList() {
       const data = await response.json();
       // Extraer todas las IPs únicas de la lista de forma eficiente
       const ips = new Set();
+      const fullData = {}; // Guardar datos completos por IP+ISP
+      
       if (data.data && Array.isArray(data.data)) {
         data.data.forEach(entry => {
           if (entry.ip) {
-            ips.add(entry.ip.toLowerCase());
+            const ipLower = entry.ip.toLowerCase();
+            ips.add(ipLower);
+            
+            // Guardar datos completos: key = IP, value = array de registros por ISP
+            if (!fullData[ipLower]) {
+              fullData[ipLower] = [];
+            }
+            fullData[ipLower].push({
+              isp: entry.isp,
+              description: entry.description,
+              stateChanges: entry.stateChanges
+            });
           }
         });
       }
       cachedBlockList = {
         ips: ips,
+        fullData: fullData,
         lastUpdate: Date.now()
       };
       lastUpdate = Date.now();
@@ -130,12 +144,19 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // --- PRIORIDAD DE ICONOS ---
     let finalIcon = "cf-off.png"; 
 
-    // Como es un historial, usaremos el icono AMARILLO (Warning) 
-    // porque estar en la lista no garantiza bloqueo activo en TU operador,
-    // pero sí indica "Peligro / Fichado".
-    if (blockStatus === 'listed') {
-      finalIcon = "cf-blocked.png"; 
+    // Analizar el nuevo objeto de estado con timestamps
+    if (blockStatus.status === 'blocked') {
+      // 🔴 ROJO: Actualmente bloqueada por al menos un ISP
+      finalIcon = "cf-blocked.png";
+      console.log("🔴 Icono ROJO: Bloqueada por", blockStatus.details.blockedByISPs.map(b => b.isp).join(', '));
+    } else if (blockStatus.status === 'listed') {
+      // 🟡 AMARILLO: Listada pero no actualmente bloqueada
+      // (fue bloqueada en el pasado o solo algunos ISPs la tenían)
+      finalIcon = "cf-warning.png"; // Icono amarillo para advertencia histórica
+      console.log("🟡 Icono AMARILLO: Listada pero no actualmente bloqueada. ISPs:", 
+        blockStatus.details.listedButNotBlockedISPs.map(b => b.isp).join(', '));
     } else if (cloudflareDetected) {
+      // 💙 AZUL: Usa Cloudflare pero no está bloqueada
       finalIcon = "cf-on.png";
     }
 
@@ -159,33 +180,104 @@ chrome.tabs.onCreated.addListener((tab) => {
   chrome.action.setIcon({ tabId: tab.id, path: "cf-off.png" });
 });
 
-// Función síncrona mejorada para búsqueda eficiente
+// Función mejorada que analiza el estado actual y quién está bloqueando
 function checkBlockStatus(currentUrl, ipAddress) {
   if (!cachedBlockList.ips || cachedBlockList.ips.size === 0) {
     console.log("⚠️ Lista de bloqueos vacía para URL:", currentUrl);
-    return 'clean';
+    return { status: 'clean', details: null };
   }
 
   try {
     const urlObj = new URL(currentUrl);
     const domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
 
-    // BÚSQUEDA EFICIENTE: Comprobar la IP de forma precisa (no substring)
-    if (ipAddress) {
-      const ipLower = ipAddress.toLowerCase();
-      if (cachedBlockList.ips.has(ipLower)) {
-        console.log("🔴 IP BLOQUEADA:", ipLower, "para dominio:", domain);
-        return 'listed';
-      }
+    // BÚSQUEDA EFICIENTE: Comprobar la IP de forma precisa
+    if (!ipAddress) {
+      console.log("✅ Dominio:", domain, "IP: N/A", "Estado: LIMPIO");
+      return { status: 'clean', details: null };
     }
 
-    // Log para debugging
-    console.log("✅ Dominio:", domain, "IP:", ipAddress || "N/A", "Estado: LIMPIO");
-    return 'clean';
+    const ipLower = ipAddress.toLowerCase();
+    if (!cachedBlockList.ips.has(ipLower)) {
+      console.log("✅ Dominio:", domain, "IP:", ipLower, "Estado: LIMPIO");
+      return { status: 'clean', details: null };
+    }
+
+    // La IP está en la lista, ahora analizamos el estado actual por ISP
+    const ipRecords = cachedBlockList.fullData[ipLower] || [];
+    
+    if (ipRecords.length === 0) {
+      console.log("⚠️ IP encontrada pero sin datos:", ipLower);
+      return { status: 'listed', details: null };
+    }
+
+    // Analizar el último estado para cada ISP
+    const blockedByISPs = [];
+    const listedButNotBlockedISPs = [];
+
+    ipRecords.forEach(record => {
+      if (!record.stateChanges || record.stateChanges.length === 0) {
+        return;
+      }
+
+      const lastChange = record.stateChanges[record.stateChanges.length - 1];
+      const isCurrentlyBlocked = lastChange.state === true;
+      const lastTimestamp = new Date(lastChange.timestamp);
+
+      if (isCurrentlyBlocked) {
+        blockedByISPs.push({
+          isp: record.isp,
+          timestamp: lastTimestamp,
+          timestampStr: lastChange.timestamp,
+          description: record.description
+        });
+      } else {
+        listedButNotBlockedISPs.push({
+          isp: record.isp,
+          timestamp: lastTimestamp,
+          timestampStr: lastChange.timestamp,
+          description: record.description
+        });
+      }
+    });
+
+    // Determinar el estado final
+    if (blockedByISPs.length > 0) {
+      // Algún ISP la está bloqueando ahora
+      const blockedInfo = blockedByISPs.map(b => 
+        `${b.isp} (${b.timestamp.toLocaleString('es-ES')})`
+      ).join(', ');
+      
+      console.log("🔴 IP BLOQUEADA:", ipLower, "para dominio:", domain);
+      console.log("   Bloqueada por:", blockedInfo);
+      
+      return {
+        status: 'blocked',
+        details: {
+          ip: ipLower,
+          domain: domain,
+          blockedByISPs: blockedByISPs,
+          listedButNotBlockedISPs: listedButNotBlockedISPs
+        }
+      };
+    } else {
+      // Está listada pero no está bloqueada actualmente
+      console.log("⚠️ IP LISTADA pero NO bloqueada actualmente:", ipLower);
+      
+      return {
+        status: 'listed',
+        details: {
+          ip: ipLower,
+          domain: domain,
+          listedButNotBlockedISPs: listedButNotBlockedISPs,
+          lastBlockedAt: listedButNotBlockedISPs.length > 0 ? listedButNotBlockedISPs[0].timestamp : null
+        }
+      };
+    }
 
   } catch (error) {
     console.error("Error comprobando bloqueo:", error);
-    return 'clean';
+    return { status: 'clean', details: null };
   }
 }
 

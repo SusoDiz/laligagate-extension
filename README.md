@@ -7,11 +7,17 @@ Herramienta de análisis de red para navegadores basada en Chromium. Detecta inf
 ## 🚀 Funcionalidades
 
 * **⚡ Detector de Cloudflare:** Analiza las cabeceras HTTP (`Server`, `CF-Ray`) para identificar si el sitio web usa la red de Cloudflare.
-* **⚠️ Monitor de Bloqueos:** Consulta automáticamente la API pública de [hayahora.futbol](https://hayahora.futbol) para comprobar si la IP o el dominio actual aparecen en el historial de bloqueos.
+* **⚠️ Monitor de Bloqueos Inteligente:** Consulta automáticamente la API pública de [hayahora.futbol](https://hayahora.futbol) para verificar si la IP actual está bloqueada.
+  * **🔴 Rojo:** Actualmente bloqueada por uno o más ISPs
+  * **🟡 Naranja:** Listada históricamente pero no actualmente bloqueada
+  * **🟢 Verde:** Sin bloqueos detectados
+* **📊 Análisis por Operadora:** Muestra qué ISPs tienen la IP bloqueada o la han bloqueado en el pasado, con timestamps exactos.
+* **⏰ Historial de Cambios:** Registra cuándo se aplicaron/removieron los bloqueos para cada operadora.
 * **🚦 Semáforo de Estado:**
-    * ⚪ **Gris:** Web normal / No listada.
-    * 🟠 **Naranja:** Web usando Cloudflare.
-    * 🔴 **Rojo:** Web listada en historial de bloqueos (Potencialmente afectada).
+    * ⚪ **Gris (`cf-off.png`):** Web normal / No listada / Sin Cloudflare
+    * 🟡 **Amarillo (`cf-warning.png`):** Listada históricamente pero NO actualmente bloqueada
+    * 🟠 **Naranja (`cf-on.png`):** Web usando Cloudflare (pero sin bloqueos activos)
+    * 🔴 **Rojo (`cf-blocked.png`):** Web ACTUALMENTE bloqueada por uno o más ISPs
 * **🔒 Privacidad:** Todo el análisis se realiza localmente. No se envían datos de navegación a servidores externos.
 
 ## 📥 Instalación
